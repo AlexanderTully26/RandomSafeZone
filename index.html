@@ -1,36 +1,36 @@
-<!DOCTYPE html>
+      <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Safe Zone Clock</title>
+  <title>Safe Zone Tracker</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #1c1c2e;
-      color: #fff;
+      background: #1e1e2f;
+      color: white;
       text-align: center;
-      padding: 5em 1em;
+      padding-top: 10vh;
     }
     h1 {
       font-size: 2em;
-      margin-bottom: 0.5em;
     }
-    #zones {
-      font-size: 1.5em;
-      color: #00ffd1;
+    #location {
+      font-size: 2em;
+      margin-top: 10px;
+      color: #00ffcc;
     }
     #timer {
-      margin-top: 1em;
-      font-size: 1.3em;
-      color: #ffd700;
+      font-size: 1.5em;
+      margin-top: 20px;
+      color: #ffcc00;
     }
   </style>
 </head>
 <body>
 
   <h1>Current Safe Zone(s):</h1>
-  <div id="zones">Loading...</div>
+  <div id="location">Loading...</div>
   <div id="timer">Calculating...</div>
 
   <script>
@@ -44,44 +44,83 @@
       "All Commons"
     ];
 
-    const SLOT_DURATION_MINUTES = 6; // 10 slots in an hour
-    const SLOT_DURATION_MS = SLOT_DURATION_MINUTES * 60 * 1000;
+    const MIN_DURATION = 5 * 60 * 1000;  // 5 minutes
+    const MAX_DURATION = 60 * 60 * 1000; // 60 minutes
 
-    function getCurrentSafeZones() {
+    function deterministicRandom(seed) {
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) {
+        hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      return Math.abs(hash % 10000) / 10000; // returns float between 0-1
+    }
+
+    function getSafeZonesForNow() {
       const now = new Date();
-      const startOfHour = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours());
-      const minutesIntoHour = now.getMinutes();
-      const currentSlot = Math.floor(minutesIntoHour / SLOT_DURATION_MINUTES);
+      const hourSeed = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
+      const safeZones = [];
 
-      const zones = [];
+      locations.forEach(location => {
+        // Create deterministic random start and duration
+        const seedBase = `${hourSeed}-${location}`;
+        const startRand = deterministicRandom(seedBase + "-start");
+        const durRand = deterministicRandom(seedBase + "-duration");
 
-      // Each location is assigned to one slot per hour (cyclically)
-      locations.forEach((loc, i) => {
-        const assignedSlot = i % (60 / SLOT_DURATION_MINUTES);
-        if (assignedSlot === currentSlot) {
-          zones.push(loc);
+        const startOffset = Math.floor(startRand * (60 * 60 * 1000 - MIN_DURATION));
+        const duration = MIN_DURATION + Math.floor(durRand * (MAX_DURATION - MIN_DURATION));
+
+        const startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0);
+        const safeStart = new Date(startTime.getTime() + startOffset);
+        const safeEnd = new Date(safeStart.getTime() + duration);
+
+        if (now >= safeStart && now <= safeEnd) {
+          safeZones.push({
+            location,
+            safeStart,
+            safeEnd
+          });
         }
       });
 
-      const slotEndTime = new Date(startOfHour.getTime() + (currentSlot + 1) * SLOT_DURATION_MS);
+      // Ensure at least one is returned
+      if (safeZones.length === 0) {
+        // Fallback: Pick the first location and show its next slot
+        const fallback = locations[0];
+        const seedBase = `${hourSeed}-${fallback}`;
+        const startRand = deterministicRandom(seedBase + "-start");
+        const durRand = deterministicRandom(seedBase + "-duration");
 
-      return { zones, slotEndTime };
+        const startOffset = Math.floor(startRand * (60 * 60 * 1000 - MIN_DURATION));
+        const duration = MIN_DURATION + Math.floor(durRand * (MAX_DURATION - MIN_DURATION));
+
+        const startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), 0, 0);
+        const safeStart = new Date(startTime.getTime() + startOffset);
+        const safeEnd = new Date(safeStart.getTime() + duration);
+
+        safeZones.push({
+          location: fallback,
+          safeStart,
+          safeEnd
+        });
+      }
+
+      return safeZones;
     }
 
-    function updateCountdown(endTime) {
+    function updateCountdown(safeEndTime) {
       const timerEl = document.getElementById("timer");
 
       function refresh() {
         const now = new Date();
-        const remaining = Math.max(0, endTime - now);
+        const remaining = Math.max(0, safeEndTime - now);
         const minutes = Math.floor(remaining / 60000);
         const seconds = Math.floor((remaining % 60000) / 1000);
 
-        timerEl.textContent = `Time remaining in this safe window: ${minutes}m ${seconds}s`;
+        timerEl.textContent = `Time remaining: ${minutes}m ${seconds}s`;
 
         if (remaining <= 0) {
           clearInterval(interval);
-          initialize(); // Refresh safe zone on expiration
+          initialize(); // Refresh safe zones after expiration
         }
       }
 
@@ -90,9 +129,14 @@
     }
 
     function initialize() {
-      const { zones, slotEndTime } = getCurrentSafeZones();
-      document.getElementById("zones").textContent = zones.join(", ");
-      updateCountdown(slotEndTime);
+      const safeZones = getSafeZonesForNow();
+      const locationNames = safeZones.map(z => z.location).join(", ");
+      document.getElementById("location").textContent = locationNames;
+
+      const soonestEndingZone = safeZones.reduce((min, z) => {
+        return z.safeEnd < min.safeEnd ? z : min;
+      });
+      updateCountdown(soonestEndingZone.safeEnd);
     }
 
     initialize();
