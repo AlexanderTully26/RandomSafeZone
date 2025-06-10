@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Safe Zone Selector</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    .result {
+      margin: 20px 0;
+      font-size: 1.5em;
+      color: #0077cc;
+    }
+
+    button {
+      background-color: #0077cc;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      font-size: 1em;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #005fa3;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Safe Zone Selector</h1>
+  <div class="result" id="zoneDisplay">Click the button to select a safe zone</div>
+  <button onclick="selectSafeZone()">Select Safe Zone</button>
+
+  <script>
+    const zones = [
+      "Lunch Room",
+      "Mastery Room",
+      "9th Floor Commons",
+      "536 Entrance",
+      "259 First Floor",
+      "901 Classroom",
+      "All Commons"
+    ];
+
+    function getRandomZone() {
+      const index = Math.floor(Math.random() * zones.length);
+      return zones[index];
+    }
+
+    function getRandomDuration() {
+      const minMinutes = 1;
+      const maxMinutes = 60;
+      const duration = Math.floor(Math.random() * (maxMinutes - minMinutes + 1)) + minMinutes;
+
+      const minutes = duration % 60;
+      const hours = Math.floor(duration / 60);
+
+      if (hours > 0) {
+        return `${hours} hour${hours > 1 ? 's' : ''}${minutes > 0 ? ` and ${minutes} minute${minutes > 1 ? 's' : ''}` : ''}`;
+      } else {
+        return `${minutes} minute${minutes > 1 ? 's' : ''}`;
+      }
+    }
+
+    function selectSafeZone() {
+      const zone = getRandomZone();
+      const duration = getRandomDuration();
+      document.getElementById("zoneDisplay").textContent = `${zone} is the safe zone for ${duration}.`;
+    }
+  </script>
+
+</body>
+</html>
